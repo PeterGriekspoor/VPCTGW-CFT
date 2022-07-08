@@ -1,0 +1,415 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Create VPC, Subnets and Trasit Gateway for training"
+Parameters:
+
+    INGRESSVPCCIDR:
+        Type: "String"
+        Description: "CIDR for INGRESS VPC"
+        Default: "172.16.0.0/23"
+
+    SUB01INGRESSVPCCIDR:
+        Type: "String"
+        Description: "CIDR for Subnet 01 of INGRESS VPC"
+        Default: "172.16.0.0/24"
+
+    SUB02INGRESSVPCCIDR:
+        Type: "String"
+        Description: "CIDR for Subnet 02 of INGRESS VPC"
+        Default: "172.16.1.0/24"
+
+    SPOKE01VPCCIDR:
+        Type: "String"
+        Description: "CIDR for SPOKE-01 VPC"
+        Default: "192.168.0.0/23"
+
+    SUB01SPOKE01VPCCIDR:
+        Type: "String"
+        Description: "CIDR for Subnet 01 of SPOKE 01 VPC"        
+        Default: "192.168.0.0/24"
+
+    SUB02SPOKE01VPCCIDR:
+        Type: "String"
+        Description: "CIDR for Subnet 02 of SPOKE 01 VPC"
+        Default: "192.168.1.0/24"
+
+    SPOKE02VPCCIDR:
+        Type: "String"
+        Description: "CIDR for SPOKE-02 VPC"
+        Default: "192.168.2.0/23"
+
+    SUB01SPOKE02VPCCIDR:
+        Type: "String"
+        Description: "CIDR for Sub 01 of  SPOKE 02 VPC"
+        Default: "192.168.2.0/24"
+        
+    SUB02SPOKE02VPCCIDR:
+        Type: "String"
+        Description: "CIDR for Sub 02 of  SPOKE 02 VPC"
+        Default: "192.168.3.0/24"
+
+    DEFAULTCIDR:
+        Type: "String"
+        Description: "Destination CIDR for all traffic"
+        Default: "0.0.0.0/0"
+
+    CUSTOMCIDR:
+        Type: "String"
+        Description: "CIDR of route from INGRESS VPC to TGW"
+        Default: "192.168.0.0/22"
+    
+    LatestAmiId:
+        Type:  'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+        Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+        Description: "DO NOT CHANGE unless required. It picks latest Amazon Linux 2 AMI"
+
+    EC2InstanceType:
+        Type: "String"
+        Description: "Specify a valid instance type for EC2"
+        Default: "t2.medium"
+
+    KeyName:
+        Description: Select name of an existing EC2 KeyPair to enable SSH access to the web server
+        Type: AWS::EC2::KeyPair::KeyName
+        ConstraintDescription: must be the name of an existing EC2 KeyPair.
+Resources:
+
+    INGRESSVPC:
+        Type: "AWS::EC2::VPC"
+        Properties:
+            CidrBlock: !Ref INGRESSVPCCIDR
+            EnableDnsSupport: true
+            EnableDnsHostnames: false
+            InstanceTenancy: "default"
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "INGRESS-VPC"
+
+    SPOKE01VPC:
+        Type: "AWS::EC2::VPC"
+        Properties:
+            CidrBlock: !Ref SPOKE01VPCCIDR
+            EnableDnsSupport: true
+            EnableDnsHostnames: false
+            InstanceTenancy: "default"
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "Spoke-01"
+
+    SPOKE02VPC:
+        Type: "AWS::EC2::VPC"
+        Properties:
+            CidrBlock: !Ref SPOKE02VPCCIDR
+            EnableDnsSupport: true
+            EnableDnsHostnames: false
+            InstanceTenancy: "default"
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "Spoke-02"
+
+
+    SUB01SPOKE01:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            AvailabilityZone: !Sub "${AWS::Region}a"
+            CidrBlock: !Ref SUB01SPOKE01VPCCIDR
+            VpcId: !Ref SPOKE01VPC
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "sub-01-spoke-01"
+    SUB02SPOKE01:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            AvailabilityZone: !Sub "${AWS::Region}b"
+            CidrBlock: !Ref SUB02SPOKE01VPCCIDR
+            VpcId: !Ref SPOKE01VPC
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "sub-02-spoke-01"
+
+    SUB01SPOKE02:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            AvailabilityZone: !Sub "${AWS::Region}a"
+            CidrBlock: !Ref SUB01SPOKE02VPCCIDR
+            VpcId: !Ref SPOKE02VPC
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "sub-01-spoke-02"
+
+    SUB02SPOKE02:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            AvailabilityZone: !Sub "${AWS::Region}b"
+            CidrBlock: !Ref SUB02SPOKE02VPCCIDR
+            VpcId: !Ref SPOKE02VPC
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "sub-02-spoke-02"
+    SUB01INGRESS:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            AvailabilityZone: !Sub "${AWS::Region}a"
+            CidrBlock: !Ref SUB01INGRESSVPCCIDR
+            VpcId: !Ref INGRESSVPC
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "sub-01-INGRESS"
+
+    SUB02INGRESS:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            AvailabilityZone: !Sub "${AWS::Region}b"
+            CidrBlock: !Ref SUB02INGRESSVPCCIDR
+            VpcId: !Ref INGRESSVPC
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "sub-02-INGRESS"
+
+    SPOKE01RT:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: !Ref SPOKE01VPC
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "Spoke-01-RT"
+    SPOKE02RT:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: !Ref SPOKE02VPC
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "Spoke-02-RT"
+
+    INGRESSSPOKERT:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: !Ref INGRESSVPC
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "INGRESS-Spoke-RT"
+
+    INGRESSVPCGatewayAttachment:
+        Type: "AWS::EC2::VPCGatewayAttachment"
+        Properties:
+            InternetGatewayId: !Ref EC2InternetGateway
+            VpcId: !Ref INGRESSVPC
+
+    SUB01SPOKE01RTAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            RouteTableId: !Ref SPOKE01RT
+            SubnetId: !Ref SUB01SPOKE01
+
+    SUB02SPOKE01RTAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            RouteTableId: !Ref SPOKE01RT
+            SubnetId: !Ref SUB02SPOKE01
+
+    SUB01SPOKE02RTAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            RouteTableId: !Ref SPOKE02RT
+            SubnetId: !Ref SUB01SPOKE02
+
+    SUB02SPOKE02RTAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            RouteTableId: !Ref SPOKE02RT
+            SubnetId: !Ref SUB02SPOKE02
+
+    SUB01INGRESSRTAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            RouteTableId: !Ref INGRESSSPOKERT
+            SubnetId: !Ref SUB01INGRESS
+
+    SUB02INGRESSRTAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            RouteTableId: !Ref INGRESSSPOKERT
+            SubnetId: !Ref SUB02INGRESS
+
+
+    EC2InternetGateway:
+        Type: "AWS::EC2::InternetGateway"
+        Properties:
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "internet-vpc-IGW"
+
+    EC2TransitGateway:
+        Type: "AWS::EC2::TransitGateway"
+        Properties:
+            Description: "Transit Hub TGW"
+            AutoAcceptSharedAttachments: "disable"
+            DefaultRouteTableAssociation: "disable"
+            DefaultRouteTablePropagation: "disable"
+            DnsSupport: "enable"
+            VpnEcmpSupport: "enable"
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "Transit-Hub"
+
+    TGWSECURITYRT:
+        Type: "AWS::EC2::TransitGatewayRouteTable"
+        Properties:
+            TransitGatewayId: !Ref EC2TransitGateway
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "SECURITY-RT"
+
+    TGWSPOKERT:
+        Type: "AWS::EC2::TransitGatewayRouteTable"
+        Properties:
+            TransitGatewayId: !Ref EC2TransitGateway
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "Spoke-RT"
+
+    SPOKE01VPCTGWATTACHMENT:
+        Type: "AWS::EC2::TransitGatewayAttachment"
+        Properties:
+            TransitGatewayId: !Ref EC2TransitGateway
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "tgw-attach-spoke-01-vpc"
+            VpcId: !Ref SPOKE01VPC
+            SubnetIds: 
+              - !Ref SUB01SPOKE01
+              - !Ref SUB02SPOKE01
+
+    SPOKE02VPCTGWATTACHMENT:
+        Type: "AWS::EC2::TransitGatewayAttachment"
+        Properties:
+            TransitGatewayId: !Ref EC2TransitGateway
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "tgw-attach-spoke-02-vpc"
+            VpcId: !Ref SPOKE02VPC
+            SubnetIds: 
+              - !Ref SUB01SPOKE02
+              - !Ref SUB02SPOKE02  
+
+    INGRESSVPCTGWATTACHMENT:
+        Type: "AWS::EC2::TransitGatewayAttachment"
+        Properties:
+            TransitGatewayId: !Ref EC2TransitGateway
+            Tags: 
+              - 
+                Key: "Name"
+                Value: "tgw-attach-INGRESS-vpc"
+            VpcId: !Ref INGRESSVPC
+            SubnetIds: 
+              - !Ref SUB01INGRESS
+              - !Ref SUB02INGRESS
+
+    SPOKE01TGWASSOCIATION:
+        Type: "AWS::EC2::TransitGatewayRouteTableAssociation"
+        Properties:
+            TransitGatewayAttachmentId: !Ref SPOKE01VPCTGWATTACHMENT
+            TransitGatewayRouteTableId: !Ref TGWSPOKERT
+
+    SPOKE02TGWASSOCIATION:
+        Type: "AWS::EC2::TransitGatewayRouteTableAssociation"
+        Properties:
+            TransitGatewayAttachmentId: !Ref SPOKE02VPCTGWATTACHMENT
+            TransitGatewayRouteTableId: !Ref TGWSPOKERT
+
+    INGRESSTGWASSOCIATION:
+        Type: "AWS::EC2::TransitGatewayRouteTableAssociation"
+        Properties:
+            TransitGatewayAttachmentId: !Ref INGRESSVPCTGWATTACHMENT
+            TransitGatewayRouteTableId: !Ref TGWSPOKERT
+
+    INGRESSSPOKEIGWROUTE:
+        Type: "AWS::EC2::Route"
+        Properties:
+            DestinationCidrBlock: !Ref DEFAULTCIDR
+            RouteTableId: !Ref INGRESSSPOKERT
+            GatewayId: !Ref EC2InternetGateway
+
+    INGRESSSPOKETGWROUTE:
+        Type: "AWS::EC2::Route"
+        DependsOn: INGRESSTGWASSOCIATION
+        Properties:
+            DestinationCidrBlock: !Ref CUSTOMCIDR
+            RouteTableId: !Ref INGRESSSPOKERT
+            TransitGatewayId: !Ref EC2TransitGateway
+    
+    SPOKE01TGWROUTE:
+        Type: "AWS::EC2::Route"
+        DependsOn: SPOKE01TGWASSOCIATION
+        Properties:
+            DestinationCidrBlock: !Ref DEFAULTCIDR
+            RouteTableId: !Ref SPOKE01RT
+            TransitGatewayId: !Ref EC2TransitGateway
+
+    SPOKE02TGWROUTE:
+        Type: "AWS::EC2::Route"
+        DependsOn: SPOKE02TGWASSOCIATION
+        Properties:
+            DestinationCidrBlock: !Ref DEFAULTCIDR
+            RouteTableId: !Ref SPOKE02RT
+            TransitGatewayId: !Ref EC2TransitGateway
+
+    Ec2INGRESSVPC: 
+        Type: AWS::EC2::Instance
+        Properties: 
+          ImageId: !Ref LatestAmiId
+          InstanceType: !Ref EC2InstanceType  
+          KeyName: !Ref KeyName         
+          NetworkInterfaces: 
+            - AssociatePublicIpAddress: "true"
+              DeviceIndex: "0"
+              SubnetId: !Ref SUB01INGRESS   
+          Tags: 
+            - 
+              Key: "Name"
+              Value: "INGRESSVPC-EC2"     
+    Ec2Spoke01VPC: 
+        Type: AWS::EC2::Instance
+        Properties: 
+          ImageId: !Ref LatestAmiId
+          InstanceType: !Ref EC2InstanceType
+          KeyName: !Ref KeyName 
+          NetworkInterfaces: 
+            - AssociatePublicIpAddress: "false"
+              DeviceIndex: "0"
+              SubnetId: !Ref SUB01SPOKE01 
+          Tags: 
+            - 
+              Key: "Name"
+              Value: "Spoke01VPC-EC2" 
+    Ec2Spoke02VPC: 
+        Type: AWS::EC2::Instance
+        Properties: 
+          ImageId: !Ref LatestAmiId
+          InstanceType: !Ref EC2InstanceType
+          KeyName: !Ref KeyName          
+          NetworkInterfaces: 
+            - AssociatePublicIpAddress: "false"
+              DeviceIndex: "0"
+              SubnetId: !Ref SUB01SPOKE02 
+          Tags: 
+            - 
+              Key: "Name"
+              Value: "Spoke02VPC-EC2"              
